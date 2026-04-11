@@ -72,4 +72,30 @@ Example of a hook that checks if all tests are passing before allowing claude to
 }
 ```
 
-##
+## HTTP Hooks
+
+- HTTP Hooks will POST the event data to an HTTP endpoint
+- Useful for auditing
+
+Example of a hook sending events to an audit service
+
+```JSON
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:8080/hooks/tool-use",
+            "headers": {
+              "Authorization": "Bearer $MY_TOKEN"
+            },
+            "allowedEnvVars": ["MY_TOKEN"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
