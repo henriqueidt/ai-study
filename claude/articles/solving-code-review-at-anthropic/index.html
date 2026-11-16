@@ -370,23 +370,7 @@ const SLIDES = [
   },
   {
     type: "question",
-    kicker: "Round 7 · The overnight disaster",
-    q: "One PR went through 50+ AI review rounds in one night. Why?",
-    options: ["The code was terrible", "Claude was hallucinating bugs", "Claude kept finding OLD bugs", "The author kept adding features"],
-    correct: 2,
-    notes: "~60s. Great story. git blame showed ~59% of flagged code was older than the first review. The reviewer was auditing the whole neighborhood. Show the fixes and the results.",
-    reveal: `
-      <p><b class="hl-cyan">git blame showed ~59% of the flagged code was older than the reviewer's first pass.</b> Each round, the reviewer found problems that were already in the codebase.</p>
-      <p>Fixes: <b>cap at 3 rounds</b> (then: “reconsider the approach”), diff-only re-reviews, flag the <i>class</i> of bug, never repeat a finding, and nightly agents to sweep old code.</p>
-      <div class="stats">
-        <div class="stat"><div class="big"><s>65%</s> → 78%</div><div class="lbl">pass after one review-and-fix round</div></div>
-        <div class="stat"><div class="big"><s>8.9%</s> → 1.5%</div><div class="lbl">need 5+ rounds</div></div>
-        <div class="stat"><div class="big"><s>2.08</s> → 1.32</div><div class="lbl">mean reviews to pass</div></div>
-      </div>`
-  },
-  {
-    type: "question",
-    kicker: "Round 8 · Job security",
+    kicker: "Round 7 · Job security",
     q: "Which job have humans mostly handed over to machines?",
     options: ["Deciding WHAT to build", "Reading every line of the diff", "Reviewing billing & auto-updater code", "Owning what ships"],
     correct: 1,
