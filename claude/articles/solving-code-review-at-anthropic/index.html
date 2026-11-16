@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Would You Merge It?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0b14;
+    --bg2: #151528;
+    --card: #1c1c34;
+    --line: #2e2e52;
+    --text: #f3f1ff;
+    --muted: #9a97c0;
+    --pink: #ff3d81;
+    --yellow: #ffd23f;
+    --cyan: #3ddcff;
+    --green: #3dff9e;
+    --red: #ff4d4d;
+    --orange: #ff9a3d;
+    --font: "Space Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(1200px 700px at 80% -10%, #2a1650 0%, transparent 60%),
+                radial-gradient(900px 600px at -10% 110%, #0f3a4a 0%, transparent 60%),
+                var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    overflow: hidden;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px; font-family: var(--mono); font-size: 14px; color: var(--muted);
+  }
+  .score { display: flex; gap: 10px; align-items: center; }
+  .team {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 8px 6px 16px; transition: transform .3s;
+  }
+  .team b { font-size: 22px; color: var(--text); min-width: 32px; text-align: center;
+    background: var(--bg2); border-radius: 999px; padding: 2px 10px; }
+  .team.you b { color: var(--cyan); }
+  .team.blog b { color: var(--pink); }
+  .team.bump { transform: scale(1.25); }
+  .vs { color: var(--yellow); font-weight: 700; }
+  .meta { display: flex; gap: 18px; align-items: center; }
+  .timer.warn { color: var(--orange); }
+  .timer.over { color: var(--red); }
+
+  .progress { position: fixed; bottom: 0; left: 0; height: 4px; z-index: 20;
+    background: linear-gradient(90deg, var(--cyan), var(--pink)); transition: width .4s; }
+
+  /* ---------- Slides ---------- */
+  .deck { position: relative; height: 100%; }
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 80px max(28px, 7vw) 60px;
+    opacity: 0; pointer-events: none; transform: translateX(40px);
+    transition: opacity .45s, transform .45s;
+  }
+  .slide.active { opacity: 1; pointer-events: auto; transform: none; }
+  .slide.past { transform: translateX(-40px); }
+
+  .kicker {
+    font-family: var(--mono); font-size: clamp(13px, 1.3vw, 18px); letter-spacing: .14em;
+    text-transform: uppercase; color: var(--yellow); margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(44px, 7.5vw, 120px); line-height: .95; letter-spacing: -.03em; }
+  h2 { font-size: clamp(30px, 4.4vw, 68px); line-height: 1.05; letter-spacing: -.02em; max-width: 22ch; }
+  h3 { font-size: clamp(20px, 2.2vw, 32px); line-height: 1.15; }
+  p.lead { font-size: clamp(18px, 1.9vw, 28px); color: var(--muted); max-width: 50ch; margin-top: 22px; line-height: 1.35; }
+  .hl-pink { color: var(--pink); }
+  .hl-cyan { color: var(--cyan); }
+  .hl-yellow { color: var(--yellow); }
+  .hl-green { color: var(--green); }
+  code, .mono { font-family: var(--mono); }
+
+  /* ---------- Title ---------- */
+  .title-wrap h1 span { display: inline-block; }
+  .title-wrap h1 .q { color: var(--pink); animation: wobble 2.4s ease-in-out infinite; }
+  @keyframes wobble { 0%,100% { transform: rotate(0) } 50% { transform: rotate(12deg) } }
+  .rules { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 40px; }
+  .rule { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 18px; font-size: clamp(14px, 1.3vw, 19px); }
+  .rule b { color: var(--yellow); margin-right: 6px; }
+
+  /* ---------- Question ---------- */
+  .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 36px; max-width: 1200px; }
+  .opt {
+    position: relative; text-align: left; cursor: pointer;
+    font: 600 clamp(18px, 2vw, 30px)/1.2 var(--font); color: var(--text);
+    background: var(--card); border: 2px solid var(--line); border-radius: 18px;
+    padding: 22px 24px 22px 74px; transition: transform .15s, border-color .2s, background .2s, opacity .3s;
+  }
+  .opt:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--cyan); }
+  .opt .key {
+    position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+    font: 700 18px var(--mono); background: var(--bg2); color: var(--yellow);
+  }
+  .opt:disabled { cursor: default; }
+  .opt.dim { opacity: .3; }
+  .opt.picked { border-color: var(--yellow); }
+  .opt.correct { border-color: var(--green); background: #143a2b; opacity: 1; animation: pop .5s; }
+  .opt.wrong { border-color: var(--red); background: #3a1420; opacity: 1; animation: shake .5s; }
+  .opt .tag { position: absolute; right: 14px; top: -12px; font: 700 12px var(--mono);
+    padding: 3px 8px; border-radius: 6px; letter-spacing: .08em; }
+  .opt.picked .tag { background: var(--yellow); color: #000; }
+  .opt.correct .tag { background: var(--green); color: #000; }
+  @keyframes pop { 50% { transform: scale(1.05) } }
+  @keyframes shake { 20%,60% { transform: translateX(-8px) } 40%,80% { transform: translateX(8px) } }
+
+  .reveal {
+    margin-top: 28px; max-width: 1200px; max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height .6s ease, opacity .5s .1s;
+  }
+  .reveal.show { max-height: 70vh; opacity: 1; }
+  .reveal-inner { background: linear-gradient(135deg, #22224a, #1a1a30); border: 1px solid var(--line);
+    border-left: 6px solid var(--cyan); border-radius: 16px; padding: 22px 26px;
+    font-size: clamp(16px, 1.6vw, 24px); line-height: 1.4; }
+  .reveal-inner p + p, .reveal-inner p + ul, .reveal-inner ul + p { margin-top: 10px; }
+  .reveal-inner ul { padding-left: 1.2em; }
+  .reveal-inner li { margin: 4px 0; }
+  .reveal-inner .src { font-size: .7em; color: var(--muted); font-family: var(--mono); margin-top: 12px; }
+
+  /* question slides get compact once revealed */
+  .slide.answered h2 { font-size: clamp(24px, 3vw, 46px); }
+  .slide.answered .options { margin-top: 20px; }
+  .slide.answered .pr { display: none; }
+  .slide.answered .opt { padding-top: 14px; padding-bottom: 14px; font-size: clamp(15px, 1.5vw, 22px); }
+
+  /* stamp */
+  .stamp {
+    position: fixed; left: 50%; top: 50%; z-index: 40; pointer-events: none;
+    font: 700 clamp(40px, 7vw, 110px)/1 var(--font); letter-spacing: -.02em; text-align: center;
+    padding: 18px 34px; border: 8px solid currentColor; border-radius: 20px;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(3); opacity: 0;
+  }
+  .stamp.go { animation: stamp 1.6s ease forwards; }
+  .stamp.broken { color: var(--red); background: rgba(40, 0, 10, .85); }
+  .stamp.nailed { color: var(--green); background: rgba(0, 40, 20, .85); }
+  .stamp.trick { color: var(--yellow); background: rgba(40, 30, 0, .85); }
+  .stamp small { display: block; font-size: .3em; letter-spacing: .1em; margin-top: 6px; font-family: var(--mono); }
+  @keyframes stamp {
+    0% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(3); }
+    15% { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(1); }
+    75% { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(.9); }
+  }
+  body.shake .deck { animation: shake .4s; }
+
+  /* ---------- Fake PR ---------- */
+  .pr { margin-top: 28px; max-width: 900px; background: #0d1117; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; font-family: var(--mono); }
+  .pr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #30363d; font-size: clamp(13px, 1.2vw, 17px); flex-wrap: wrap; }
+  .pr-head .add { color: #3fb950; } .pr-head .del { color: #f85149; }
+  .pr-body { height: 180px; overflow: hidden; position: relative; font-size: 13px; line-height: 1.5; padding: 10px 18px; color: #8b949e; }
+  .pr-body .scroll { animation: scrollcode 14s linear infinite; }
+  .pr-body .a { color: #3fb950; } .pr-body .d { color: #f85149; }
+  .pr-body::after { content: ""; position: absolute; inset: auto 0 0 0; height: 60px; background: linear-gradient(transparent, #0d1117); }
+  @keyframes scrollcode { to { transform: translateY(-50%); } }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 14px; position: relative; }
+  .step .n { font: 700 13px var(--mono); color: var(--yellow); }
+  .step h4 { font-size: clamp(15px, 1.35vw, 20px); margin: 6px 0 8px; }
+  .step p { font-size: clamp(12px, 1vw, 15px); color: var(--muted); line-height: 1.35; }
+  .step.human { border-color: var(--pink); }
+  .step.human .n::after { content: " · human?"; color: var(--pink); }
+  .pipe-foot { margin-top: 24px; font-size: clamp(16px, 1.6vw, 24px); color: var(--muted); }
+
+  .frag { opacity: 0; transform: translateY(14px); transition: opacity .4s, transform .4s; }
+  .frag.on { opacity: 1; transform: none; }
+
+  /* ---------- Tiers ---------- */
+  .tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 12px; }
+  .tier { border-radius: 12px; padding: 14px 16px; background: var(--bg2); border-top: 5px solid; }
+  .tier.low { border-color: var(--green); } .tier.med { border-color: var(--yellow); } .tier.high { border-color: var(--red); }
+  .tier .who { font-size: 1.6em; font-weight: 700; }
+  .tier .what { font-size: .78em; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- Stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--bg2); border-radius: 12px; padding: 12px 14px; }
+  .stat .big { font: 700 1.5em var(--mono); color: var(--green); }
+  .stat .big s { color: var(--muted); font-size: .7em; }
+  .stat .lbl { font-size: .72em; color: var(--muted); }
+
+  /* ---------- Final ---------- */
+  .final-score { display: flex; gap: 24px; align-items: stretch; margin-top: 26px; flex-wrap: wrap; }
+  .fs { background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 18px 28px; min-width: 220px; }
+  .fs .num { font: 700 clamp(48px, 6vw, 90px)/1 var(--mono); }
+  .fs.you .num { color: var(--cyan); } .fs.blog .num { color: var(--pink); }
+  .fs.win { border-color: var(--yellow); box-shadow: 0 0 40px rgba(255, 210, 63, .25); }
+  .verdict { margin-top: 18px; font-size: clamp(18px, 2vw, 30px); color: var(--yellow); }
+  .steal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+  .steal div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: clamp(14px, 1.3vw, 19px); line-height: 1.35; }
+  .steal b { display: block; color: var(--cyan); margin-bottom: 4px; }
+
+  /* ---------- Notes ---------- */
+  .notes {
+    position: fixed; right: 16px; bottom: 16px; z-index: 30; width: min(440px, calc(100vw - 32px));
+    background: rgba(10, 10, 20, .95); border: 1px solid var(--yellow); border-radius: 12px;
+    padding: 14px 16px; font-size: 14px; line-height: 1.45; color: #e9e6ff; display: none;
+  }
+  .notes.show { display: block; }
+  .notes .t { font: 700 12px var(--mono); color: var(--yellow); margin-bottom: 6px; }
+  .help { position: fixed; left: 28px; bottom: 14px; z-index: 20; font: 12px var(--mono); color: #55537a; }
+
+  canvas#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 35; }
+
+  @media (max-width: 800px) {
+    body { overflow: auto; }
+    .options, .stats, .tiers, .steal { grid-template-columns: 1fr; }
+    .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .slide { justify-content: flex-start; padding: 80px 16px 60px; overflow-y: auto; }
+    .hud { padding: 10px 16px; }
+    .meta .timer, .help { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <div class="score">
+    <div class="team you" id="teamYou">YOU <b id="scoreYou">0</b></div>
+    <span class="vs">VS</span>
+    <div class="team blog" id="teamBlog">THE BLOG <b id="scoreBlog">0</b></div>
+  </div>
+  <div class="meta">
+    <span class="timer" id="timer">00:00 / 10:00</span>
+    <span id="counter">1 / 1</span>
+  </div>
+</div>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck"></div>
+<div class="stamp" id="stamp"></div>
+<canvas id="confetti"></canvas>
+<div class="notes" id="notes"><div class="t">SPEAKER NOTES</div><div id="notesBody"></div></div>
+<div class="help">← → navigate · 1–4 pick · N notes · T timer · F fullscreen · R reset</div>
+
+<script>
+/* =========================================================
+   SLIDES
+   type: "html"     → free content; elements with .frag appear one per →
+   type: "question" → options; correct = index (or -1 for trick question)
+   ========================================================= */
+const SLIDES = [
+  {
+    type: "html",
+    notes: "~40s. Explain the rules: it's YOU vs THE BLOG. Every question, the room votes with hands, I click the majority. Guess right = point for you. Guess wrong = point for the blog. Spoiler: the blog usually wins.",
+    html: `
+      <div class="title-wrap">
+        <div class="kicker">A game show about “How we solved code review at Anthropic”</div>
+        <h1><span>Would you</span><br><span>merge it</span><span class="q">?</span></h1>
+        <p class="lead">Your instincts about code review were built for humans writing code. Let's see how they survive a team where <span class="hl-pink">Claude writes almost everything.</span></p>
+        <div class="rules">
+          <div class="rule"><b>1.</b> I ask, you vote with hands ✋</div>
+          <div class="rule"><b>2.</b> I click the majority</div>
+          <div class="rule"><b>3.</b> Right = point for you. Wrong = point for the blog</div>
+        </div>
+      </div>`
+  },
+  {
+    type: "question",
+    kicker: "Round 1 · Warm-up",
+    q: "How much of Claude Code's own code is written by Claude?",
+    options: ["~25%", "~50%", "~75%", "~90%"],
+    correct: 3,
+    notes: "~30s. Easy one, let them win to build confidence. Then: 'OK, now it gets harder.'",
+    reveal: `<p><b class="hl-cyan">About 90%.</b> The tool writes itself. Which raises the obvious problem: who reviews all of that?</p>`
+  },
+  {
+    type: "question",
+    kicker: "Round 2 · The flood",
+    q: "From June to September, merged PRs more than doubled. What happened to reverts?",
+    options: ["📈 Went way up", "↗️ Went up a bit", "➡️ Stayed the same", "📉 Dropped 40%+"],
+    correct: 3,
+    notes: "~45s. Most people expect 'more code = more breakage'. Hit the monorepo number: 2,500 → 30,000+ changes/day, about 12x.",
+    reveal: `
+      <p>More code shipped, and <b class="hl-green">the share of PRs that needed a revert fell by more than 40%.</b></p>
+      <p>Meanwhile Anthropic's monorepo went from <span class="mono hl-yellow">~2,500</span> to <span class="mono hl-yellow">30,000+</span> changes per day (May → Sept). You can't hire 12x more reviewers. So they had to rethink the whole thing.</p>`
+  },
+  {
+    type: "question",
+    kicker: "Round 3 · The goal",
+    q: "So what is the GOAL of code review now?",
+    options: ["A human reads every line", "Zero bugs, ever", "Remove humans entirely", "The least human time without more reverts"],
+    correct: 3,
+    notes: "~50s. The core idea of the post. 'Human read every line' isn't the goal; it was just how we used to get there. Emphasize the guardrail line.",
+    reveal: `
+      <p><b class="hl-cyan">Least human time per change, without more reverts or incidents.</b> Reading every line was never the goal. It was a method.</p>
+      <ul>
+        <li>They track: approvals per PR (median &amp; p95), human comments, time spent waiting on a person</li>
+        <li>Guardrail: reverts &amp; incidents. <i>“If they rise, human time was moved, not saved.”</i></li>
+      </ul>`
+  },
+  {
+    type: "question",
+    kicker: "Round 4 · Be honest",
+    q: "A new PR just landed in your queue. What's your review?",
+    pr: true,
+    options: ["LGTM 👍 (I didn't read it)", "I'll read every line carefully", "Request changes, on principle", "Leave it for tomorrow"],
+    correct: -1,
+    notes: "~45s. TRICK QUESTION, nobody scores. Whatever they pick, the point is: by the time a human sees it, Claude has already reviewed it. Review moved left, like a spellchecker.",
+    reveal: `
+      <p><b class="hl-yellow">Trick question: it doesn't matter.</b> Claude already reviewed it, probably more than once, before it got to you. Review now runs <i>“more like spellcheck while you write.”</i></p>
+      <div class="stats">
+        <div class="stat"><div class="big"><s>16%</s> → 54%</div><div class="lbl">internal PRs getting substantive comments after AI review launched</div></div>
+        <div class="stat"><div class="big">1,000+</div><div class="lbl">lines: most of these PRs get findings. Most small ones come back clean</div></div>
+        <div class="stat"><div class="big">2–3x</div><div class="lbl">better results when Claude must <i>verify</i> its work (Boris Cherny)</div></div>
+      </div>`
+  },
+  {
+    type: "html",
+    notes: "~60s. Click → to reveal each step. Key message: humans only appear in step 5, and only when the risk calls for it. Everything else is automated and blocking.",
+    html: `
+      <div class="kicker">Intermission · The life of a change</div>
+      <h2>Seven layers. <span class="hl-pink">One</span> of them might be you.</h2>
+      <div class="pipeline">
+        <div class="step frag"><div class="n">01</div><h4>Before the PR</h4><p>Claude runs tests, build, lint. A 2nd agent reviews the diff with fresh context</p></div>
+        <div class="step frag"><div class="n">02</div><h4>Required CI</h4><p>Lint, types, tests on every platform, build, packaging. Red blocks merge</p></div>
+        <div class="step frag"><div class="n">03</div><h4>Claude review</h4><p>Parallel agents hunt bugs, verifiers vote, survivors ranked by severity</p></div>
+        <div class="step frag"><div class="n">04</div><h4>Security review</h4><p>A separate pass. Open findings block merge</p></div>
+        <div class="step frag human"><div class="n">05</div><h4>Risk-based approval</h4><p>A classifier picks: 0, 1 or 2 humans</p></div>
+        <div class="step frag"><div class="n">06</div><h4>Merge queue</h4><p>Checks rerun against latest main</p></div>
+        <div class="step frag"><div class="n">07</div><h4>After merge</h4><p>Feature flags, internal use first, <code>latest</code> before <code>stable</code></p></div>
+      </div>
+      <p class="pipe-foot frag">Every AI finding must be <b class="hl-cyan">fixed or resolved with a reason</b>. Style nits get filtered out by agent voting.</p>`
+  },
+  {
+    type: "question",
+    kicker: "Round 5 · Headcount",
+    q: "How many humans must approve a PR?",
+    options: ["Two, always", "One, always", "Zero. Robots only 🤖", "It depends on the change"],
+    correct: 3,
+    notes: "~45s. Walk the three tiers. Goal: most PRs merge with at most one human, and that human can be the author. Sensitive areas such as caching, the auto-updater and system prompts always need at least one.",
+    reveal: `
+      <p><b class="hl-cyan">It depends on the risk.</b> Most PRs should merge with <b>at most one human</b>, and that human can be the author.</p>
+      <div class="tiers">
+        <div class="tier low"><div class="who">0 humans</div><div class="what">Low: docs, copy, internal features, additive changes behind a flag</div></div>
+        <div class="tier med"><div class="who">1 human</div><div class="what">Medium: normal product changes + caching, auto-updater, system prompts</div></div>
+        <div class="tier high"><div class="who">2 humans</div><div class="what">High: the riskiest code, plus some paths that always need two</div></div>
+      </div>`
+  },
+  {
+    type: "question",
+    kicker: "Round 6 · Who's the boss",
+    q: "Who decides which risk tier a PR gets?",
+    options: ["The author", "The tech lead", "A coin flip 🪙", "The change itself"],
+    correct: 3,
+    notes: "~40s. 'The change sets the tier, not the author.' A classifier reads the diff. Also mention: an agent's approval NEVER counts as a human's, and approvals are tied to one specific commit.",
+    reveal: `
+      <p><b class="hl-cyan">The change sets the tier, not the author.</b> A classifier reads the diff. Only trusted authors get lighter paths.</p>
+      <ul>
+        <li>An agent's approval <b class="hl-pink">never</b> counts as a human's</li>
+        <li>The person who directed the agent counts as a required reviewer</li>
+        <li>Approvals apply to one specific commit. Push again and you need a new approval</li>
+      </ul>`
+  },
+  {
+    type: "question",
+    kicker: "Round 7 · The overnight disaster",
+    q: "One PR went through 50+ AI review rounds in one night. Why?",
+    options: ["The code was terrible", "Claude was hallucinating bugs", "Claude kept finding OLD bugs", "The author kept adding features"],
+    correct: 2,
+    notes: "~60s. Great story. git blame showed ~59% of flagged code was older than the first review. The reviewer was auditing the whole neighborhood. Show the fixes and the results.",
+    reveal: `
+      <p><b class="hl-cyan">git blame showed ~59% of the flagged code was older than the reviewer's first pass.</b> Each round, the reviewer found problems that were already in the codebase.</p>
+      <p>Fixes: <b>cap at 3 rounds</b> (then: “reconsider the approach”), diff-only re-reviews, flag the <i>class</i> of bug, never repeat a finding, and nightly agents to sweep old code.</p>
+      <div class="stats">
+        <div class="stat"><div class="big"><s>65%</s> → 78%</div><div class="lbl">pass after one review-and-fix round</div></div>
+        <div class="stat"><div class="big"><s>8.9%</s> → 1.5%</div><div class="lbl">need 5+ rounds</div></div>
+        <div class="stat"><div class="big"><s>2.08</s> → 1.32</div><div class="lbl">mean reviews to pass</div></div>
+      </div>`
+  },
+  {
+    type: "question",
+    kicker: "Round 8 · Job security",
+    q: "Which job have humans mostly handed over to machines?",
+    options: ["Deciding WHAT to build", "Reading every line of the diff", "Reviewing billing & auto-updater code", "Owning what ships"],
+    correct: 1,
+    notes: "~45s. Humans are still in the loop, just in different places. Engineers now learn the codebase by asking Claude for explainers, not by reading every PR.",
+    reveal: `
+      <p><b class="hl-cyan">Reading every line.</b> Humans are still in the loop, in these places:</p>
+      <ul>
+        <li><b>Direction:</b> should we build this at all? Taste and scope</li>
+        <li><b>Risky code:</b> billing, the auto-updater, CI workflows</li>
+        <li><b>Architecture</b> that other people will copy</li>
+        <li><b>Reading evidence:</b> test output, commands, screenshots, findings</li>
+        <li><b>Owning outcomes:</b> a person is accountable for every change that ships</li>
+      </ul>`
+  },
+  {
+    type: "question",
+    kicker: "Final round · 3am",
+    q: "Something broke in production. Who fixes it?",
+    options: ["The on-call SRE", "The QA team", "The author of the change", "Claude, obviously"],
+    correct: 2,
+    notes: "~45s. 'You land it, you own it.' It only works because changes are small and reversible, and incident reviews look at the system, not at people. Every incident becomes an eval for the reviewer.",
+    reveal: `
+      <p><b class="hl-cyan">“You land it, you own it.”</b> The author usually fixes what their change broke. That's only fair because:</p>
+      <ul>
+        <li>Changes are small, and everything can be undone (flags, one-step rollback)</li>
+        <li>Telemetry and internal use catch regressions early</li>
+        <li>Incident reviews ask <i>which layer should have caught this</i>, not <i>who did it</i></li>
+        <li>Every past incident becomes an <b>eval</b> the reviewer runs against daily</li>
+      </ul>`
+  },
+  {
+    type: "final",
+    notes: "~60s. Announce the winner. Then 'Steal this on Monday': pick ONE thing. Close with: 'The goal isn't fewer humans. It's humans spending time where it actually matters.'",
+  }
+];
+
+/* =========================================================
+   ENGINE
+   ========================================================= */
+const deck = document.getElementById("deck");
+const state = { i: 0, you: 0, blog: 0, answers: {}, frags: {}, start: null, timerOn: true };
+const LETTERS = ["1", "2", "3", "4"];
+
+function fakeDiff() {
+  const lines = [
+    ['a', '+  const reviewer = await spawnAgent({ fresh: true })'],
+    ['d', '-  // TODO: someone should review this'],
+    ['a', '+  if (risk.tier === "low") return autoMerge(pr)'],
+    ['', '   for (const file of diff.files) {'],
+    ['a', '+    findings.push(...await hunt(file))'],
+    ['d', '-    await waitForSeniorEngineer()'],
+    ['a', '+  const votes = await Promise.all(verifiers.map(v => v.check(f)))'],
+    ['', '   }'],
+    ['a', '+  flags.enable("new-thing", { audience: "internal" })'],
+    ['d', '-  ship(Friday, 17_59)'],
+    ['a', '+  assert(approvals.every(a => a.isHuman))'],
+    ['a', '+  // reviewed by: claude, claude, claude, claude'],
+  ];
+  const html = lines.map(([c, t]) => `<div class="${c}">${t.replace(/</g, "&lt;")}</div>`).join("");
+  return html + html + html + html;
+}
+
+function render() {
+  deck.innerHTML = SLIDES.map((s, idx) => {
+    if (s.type === "question") {
+      return `<section class="slide" data-idx="${idx}">
+        <div class="kicker">${s.kicker}</div>
+        <h2>${s.q}</h2>
+        ${s.pr ? `<div class="pr">
+            <div class="pr-head"><span>#4817 refactor: everything, basically</span><span><span class="add">+1,247</span> <span class="del">−312</span> · 38 files</span></div>
+            <div class="pr-body"><div class="scroll">${fakeDiff()}</div></div>
+          </div>` : ""}
+        <div class="options">
+          ${s.options.map((o, k) => `<button class="opt" data-k="${k}"><span class="key">${LETTERS[k]}</span>${o}<span class="tag"></span></button>`).join("")}
+        </div>
+        <div class="reveal"><div class="reveal-inner">${s.reveal}</div></div>
+      </section>`;
+    }
+    if (s.type === "final") {
+      return `<section class="slide" data-idx="${idx}">
+        <div class="kicker">Final score</div>
+        <h2 id="finalTitle">And the winner is…</h2>
+        <div class="final-score">
+          <div class="fs you" id="fsYou"><div class="lbl">YOU</div><div class="num" id="fsYouN">0</div></div>
+          <div class="fs blog" id="fsBlog"><div class="lbl">THE BLOG</div><div class="num" id="fsBlogN">0</div></div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+        <div class="steal">
+          <div><b>1 · Make it runnable</b>A short <code>CLAUDE.md</code> listing checks agents can run, plus hooks for formatters and linters</div>
+          <div><b>2 · Review before the PR</b>Run <code>/code-review</code> and <code>/security-review</code>. Add a <code>REVIEW.md</code></div>
+          <div><b>3 · Upgrade the PR template</b>Testing · Risk · How to revert</div>
+          <div><b>4 · Tier by risk</b>Write tiers based on the change. Use CODEOWNERS for sensitive paths. A bot never replaces a human</div>
+          <div><b>5 · Cap the rounds</b>Tune the AI reviewer on one repo first. Turn every incident into an eval</div>
+          <div><b>6 · Measure human time</b>…with reverts and incidents as the guardrail</div>
+        </div>
+      </section>`;
+    }
+    return `<section class="slide" data-idx="${idx}">${s.html}</section>`;
+  }).join("");
+
+  deck.querySelectorAll(".opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = +btn.closest(".slide").dataset.idx;
+      answer(idx, +btn.dataset.k);
+    });
+  });
+}
+
+function slideEl(idx) { return deck.querySelector(`.slide[data-idx="${idx}"]`); }
+
+function answer(idx, k) {
+  const s = SLIDES[idx];
+  if (state.answers[idx] !== undefined) return;
+  state.answers[idx] = k;
+  applyAnswer(idx, true);
+  if (s.correct === -1) {
+    showStamp("trick", "TRICK QUESTION", "nobody scores");
+  } else if (k === s.correct) {
+    state.you++; bump("teamYou"); confetti();
+    showStamp("nailed", "NAILED IT", "+1 for you");
+  } else {
+    state.blog++; bump("teamBlog");
+    document.body.classList.add("shake");
+    setTimeout(() => document.body.classList.remove("shake"), 400);
+    showStamp("broken", "EXPECTATION<br>BROKEN", "+1 for the blog");
+  }
+  updateHud();
+}
+
+function applyAnswer(idx, animate) {
+  const s = SLIDES[idx], el = slideEl(idx), k = state.answers[idx];
+  if (k === undefined) return;
+  el.classList.add("answered");
+  el.querySelectorAll(".opt").forEach((b, j) => {
+    b.disabled = true;
+    const tag = b.querySelector(".tag");
+    if (s.correct === -1) {
+      if (j === k) { b.classList.add("picked"); tag.textContent = "YOU PICKED"; } else b.classList.add("dim");
+    } else if (j === s.correct) {
+      b.classList.add("correct"); tag.textContent = j === k ? "YOU · CORRECT" : "THE BLOG SAYS";
+    } else if (j === k) {
+      b.classList.add("wrong");
+    } else b.classList.add("dim");
+  });
+  const r = el.querySelector(".reveal");
+  setTimeout(() => r.classList.add("show"), animate ? 1300 : 0);
+}
+
+function bump(id) {
+  const t = document.getElementById(id);
+  t.classList.add("bump"); setTimeout(() => t.classList.remove("bump"), 350);
+}
+
+function showStamp(kind, text, sub) {
+  const st = document.getElementById("stamp");
+  st.className = "stamp " + kind;
+  st.innerHTML = `${text}<small>${sub}</small>`;
+  void st.offsetWidth;
+  st.classList.add("go");
+}
+
+function updateHud() {
+  document.getElementById("scoreYou").textContent = state.you;
+  document.getElementById("scoreBlog").textContent = state.blog;
+  document.getElementById("counter").textContent = `${state.i + 1} / ${SLIDES.length}`;
+  document.getElementById("progress").style.width = `${(state.i + 1) / SLIDES.length * 100}%`;
+  document.getElementById("notesBody").textContent = SLIDES[state.i].notes || "";
+}
+
+function go(n) {
+  n = Math.max(0, Math.min(SLIDES.length - 1, n));
+  state.i = n;
+  deck.querySelectorAll(".slide").forEach((el, j) => {
+    el.classList.toggle("active", j === n);
+    el.classList.toggle("past", j < n);
+  });
+  if (!state.start && n > 0) state.start = Date.now();
+  if (SLIDES[n].type === "final") showFinal();
+  updateHud();
+}
+
+function next() {
+  const el = slideEl(state.i);
+  const hidden = el.querySelector(".frag:not(.on)");
+  if (hidden) { hidden.classList.add("on"); return; }
+  go(state.i + 1);
+}
+
+function prev() {
+  const el = slideEl(state.i);
+  const shown = el.querySelectorAll(".frag.on");
+  if (shown.length) { shown[shown.length - 1].classList.remove("on"); return; }
+  go(state.i - 1);
+}
+
+function showFinal() {
+  const total = SLIDES.filter(s => s.type === "question" && s.correct !== -1).length;
+  const answered = Object.keys(state.answers).filter(i => SLIDES[i].correct !== -1).length;
+  countUp("fsYouN", state.you); countUp("fsBlogN", state.blog);
+  const you = document.getElementById("fsYou"), blog = document.getElementById("fsBlog");
+  you.classList.toggle("win", state.you > state.blog);
+  blog.classList.toggle("win", state.blog >= state.you);
+  let v;
+  if (answered < total) v = `(${total - answered} rounds skipped. Time is a feature.)`;
+  else if (state.you === total) v = "Perfect score. You can skip reading the blog post. 👑";
+  else if (state.you > state.blog) v = "You beat the blog! Your instincts are already ahead of most teams.";
+  else if (state.you === state.blog) v = "A tie. Half your instincts still work. The other half need a merge queue.";
+  else v = "The blog wins. Your intuitions were built for a world where humans wrote the code. 🤖";
+  document.getElementById("finalTitle").innerHTML = state.you > state.blog ? "The room wins 🎉" : "The blog wins. As expected.";
+  document.getElementById("verdict").textContent = v;
+  if (state.you > state.blog) setTimeout(confetti, 500);
+}
+
+function countUp(id, to) {
+  const el = document.getElementById(id); let n = 0; el.textContent = 0;
+  const t = setInterval(() => { el.textContent = Math.min(n, to); if (n++ >= to) clearInterval(t); }, 120);
+}
+
+/* timer */
+setInterval(() => {
+  const t = document.getElementById("timer");
+  if (!state.timerOn) { t.style.visibility = "hidden"; return; }
+  t.style.visibility = "visible";
+  const s = state.start ? Math.floor((Date.now() - state.start) / 1000) : 0;
+  const mm = String(Math.floor(s / 60)).padStart(2, "0"), ss = String(s % 60).padStart(2, "0");
+  t.textContent = `${mm}:${ss} / 10:00`;
+  t.classList.toggle("warn", s >= 480 && s < 600);
+  t.classList.toggle("over", s >= 600);
+}, 500);
+
+/* confetti */
+function confetti() {
+  const c = document.getElementById("confetti"), ctx = c.getContext("2d");
+  c.width = innerWidth; c.height = innerHeight;
+  const colors = ["#ff3d81", "#ffd23f", "#3ddcff", "#3dff9e"];
+  const ps = Array.from({ length: 160 }, () => ({
+    x: innerWidth / 2, y: innerHeight * .6,
+    vx: (Math.random() - .5) * 18, vy: -Math.random() * 18 - 6,
+    s: Math.random() * 8 + 4, r: Math.random() * 6, c: colors[Math.floor(Math.random() * 4)]
+  }));
+  let f = 0;
+  (function tick() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .5; p.r += .1;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * .6); ctx.restore(); });
+    if (f++ < 120) requestAnimationFrame(tick); else ctx.clearRect(0, 0, c.width, c.height);
+  })();
+}
+
+/* keys */
+document.addEventListener("keydown", e => {
+  const s = SLIDES[state.i];
+  if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); next(); }
+  else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); prev(); }
+  else if (s.type === "question" && ["1", "2", "3", "4"].includes(e.key)) answer(state.i, +e.key - 1);
+  else if (e.key === "n" || e.key === "N") document.getElementById("notes").classList.toggle("show");
+  else if (e.key === "t" || e.key === "T") state.timerOn = !state.timerOn;
+  else if (e.key === "f" || e.key === "F") {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.();
+  }
+  else if (e.key === "r" || e.key === "R") {
+    if (confirm("Reset score and go back to the start?")) {
+      Object.assign(state, { you: 0, blog: 0, answers: {}, start: null });
+      render(); go(0);
+    }
+  }
+});
+
+render();
+go(0);
+</script>
+</body>
+</html>
